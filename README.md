@@ -1,6 +1,6 @@
 # GPT Image2 个人图片站
 
-基于胜算云 API 的本地个人图片生成站，支持 image2 异步任务提交、轮询、预览与下载。
+基于 OpenAI 兼容 API 的本地个人图片生成站，支持 image2 异步任务提交、轮询、预览与下载。
 
 **零依赖、单文件**，双击 `gpt-image2本地工作站.html` 即可在浏览器中使用。
 
@@ -25,7 +25,7 @@
 
 | 参数 | 说明 | 默认值 |
 |------|------|--------|
-| Base URL | 胜算云 API 地址 | `https://router.shengsuanyun.com/api` |
+| Base URL | 你的 API 端点地址 | 无（需自行填写，例如 `https://api.example.com/v1`） |
 | API Key | 你的个人密钥 | 无（需自行填写） |
 | Model ID | 模型标识 | `openai/gpt-image-2` |
 

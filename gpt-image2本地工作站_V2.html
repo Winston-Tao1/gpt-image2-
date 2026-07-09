@@ -6,7 +6,7 @@
   <title>个人专用 GPT Image2 图片生成站</title>
   <meta
     name="description"
-    content="基于胜算云 API 的本地个人图片生成站，支持 image2 异步任务提交、轮询、预览与下载。"
+    content="基于 OpenAI 兼容 API 的本地个人图片生成站，支持 image2 异步任务提交、轮询、预览与下载。"
   >
   <style>
     :root {
@@ -1412,7 +1412,7 @@
                 <div class="loading-card">
                   <div class="spinner" aria-hidden="true"></div>
                   <h3>正在生成图片</h3>
-                  <p id="progress-text">任务已经提交，正在等待胜算云返回结果，通常需要 10 到 30 秒。</p>
+                  <p id="progress-text">任务已经提交，正在等待 API 返回结果，通常需要 10 到 30 秒。</p>
                   <div class="progress-line" aria-hidden="true">
                     <span></span>
                   </div>
@@ -1499,11 +1499,11 @@
         <div class="field-grid">
           <div class="field">
             <label for="base-url-input">Base URL</label>
-            <input id="base-url-input" type="url" placeholder="https://router.shengsuanyun.com/api">
+            <input id="base-url-input" type="url" placeholder="https://api.example.com/v1">
           </div>
           <div class="field">
             <label for="api-key-input">API Key</label>
-            <input id="api-key-input" type="password" placeholder="请输入胜算云 API Key" autocomplete="off">
+            <input id="api-key-input" type="password" placeholder="请输入 API Key" autocomplete="off">
           </div>
           <div class="field">
             <label for="model-input">Model ID</label>
@@ -1521,13 +1521,13 @@
   <script>
     (function () {
       const STORAGE_KEYS = {
-        settings: "shengsuanyun-image2-settings",
-        controls: "shengsuanyun-image2-controls-v2",
-        recentTask: "shengsuanyun-image2-recent-task-v1",
+        settings: "gpt-image2-settings",
+        controls: "gpt-image2-controls-v2",
+        recentTask: "gpt-image2-recent-task-v1",
       };
 
       const DEFAULT_SETTINGS = {
-        baseUrl: "https://router.shengsuanyun.com/api",
+        baseUrl: "",
         apiKey: "",
         model: "openai/gpt-image-2",
       };
@@ -1554,7 +1554,7 @@
         isGenerating: false,
         requestId: "",
         taskStatus: "待生成",
-        progressText: "任务已经提交，正在等待胜算云返回结果，可能需要 1 到 10 分钟。",
+        progressText: "任务已经提交，正在等待 API 返回结果，可能需要 1 到 10 分钟。",
         errorMessage: "",
         errorTimestamp: "",
         recentTask: readLocalStorage(STORAGE_KEYS.recentTask, {
@@ -2065,7 +2065,7 @@
 
           state.requestId = submitResult.requestId;
           state.taskStatus = submitResult.status || "已提交";
-          state.progressText = "任务已提交，正在向胜算云查询状态...";
+          state.progressText = "任务已提交，正在查询任务状态...";
           persistRecentTask({
             requestId: submitResult.requestId,
             status: state.taskStatus,
@@ -2329,7 +2329,7 @@
             };
           }
 
-          // 胜算云在 COMPLETED 时可能 progress 已到 100%，但结果对象稍晚落盘。
+          // API 在 COMPLETED 时可能 progress 已到 100%，但结果对象稍晚落盘。
           // 这里继续轮询几次，而不是立刻判空失败。
           if (isCompleted) {
             completedRetries++;
