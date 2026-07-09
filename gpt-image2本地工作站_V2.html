@@ -1215,6 +1215,10 @@
             <strong id="summary-base-url">未设置</strong>
           </div>
           <div class="summary-row">
+            <span>完整端点</span>
+            <strong id="summary-endpoint">未设置</strong>
+          </div>
+          <div class="summary-row">
             <span>Model ID</span>
             <strong id="summary-model">未设置</strong>
           </div>
@@ -1574,6 +1578,7 @@
 
       const elements = {
         summaryBaseUrl: document.getElementById("summary-base-url"),
+        summaryEndpoint: document.getElementById("summary-endpoint"),
         summaryModel: document.getElementById("summary-model"),
         summaryApiKey: document.getElementById("summary-api-key"),
         promptTextarea: document.getElementById("prompt-textarea"),
@@ -1848,6 +1853,9 @@
 
       function renderSettingsSummary() {
         elements.summaryBaseUrl.textContent = state.settings.baseUrl || "未设置";
+        elements.summaryEndpoint.textContent = state.settings.baseUrl
+          ? state.settings.baseUrl.replace(/\/+$/, "") + "/tasks/generations"
+          : "未设置";
         elements.summaryModel.textContent = state.settings.model || "未设置";
         elements.summaryApiKey.textContent = maskApiKey(state.settings.apiKey);
         elements.toolbarModel.textContent = state.settings.model || "尚未配置";
