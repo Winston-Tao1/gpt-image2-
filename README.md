@@ -1,4 +1,4 @@
-# GPT Image2 个人图片站
+# gpt-image2-webpage
 
 基于 OpenAI 兼容 API 的本地个人图片生成站，支持 image2 异步任务提交、轮询、预览与下载。
 
