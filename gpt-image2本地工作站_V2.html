@@ -1,0 +1,2739 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>个人专用 GPT Image2 图片生成站</title>
+  <meta
+    name="description"
+    content="基于胜算云 API 的本地个人图片生成站，支持 image2 异步任务提交、轮询、预览与下载。"
+  >
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #ffffff;
+      --bg-soft: #f5f7fb;
+      --bg-soft-2: #eef3ff;
+      --bg-soft-3: #f8fbff;
+      --panel: rgba(255, 255, 255, 0.88);
+      --panel-strong: rgba(255, 255, 255, 0.98);
+      --line: rgba(15, 23, 42, 0.08);
+      --line-strong: rgba(15, 23, 42, 0.14);
+      --text: #0f172a;
+      --text-secondary: rgba(15, 23, 42, 0.68);
+      --text-muted: rgba(15, 23, 42, 0.48);
+      --blue: #0a84ff;
+      --blue-soft: rgba(10, 132, 255, 0.12);
+      --green: #12b76a;
+      --danger: #d92d20;
+      --danger-soft: rgba(217, 45, 32, 0.1);
+      --shadow-lg: 0 28px 80px rgba(15, 23, 42, 0.10);
+      --shadow-md: 0 18px 40px rgba(15, 23, 42, 0.08);
+      --shadow-sm: 0 10px 24px rgba(15, 23, 42, 0.06);
+      --shadow-xs: 0 6px 18px rgba(15, 23, 42, 0.04);
+      --radius-2xl: 30px;
+      --radius-xl: 24px;
+      --radius-lg: 20px;
+      --radius-md: 16px;
+      --radius-sm: 14px;
+      --control-height: 54px;
+      --sidebar-width: 460px;
+      --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+      overflow-x: hidden;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font-sans);
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(10, 132, 255, 0.10), transparent 24%),
+        radial-gradient(circle at 86% 12%, rgba(57, 190, 255, 0.10), transparent 20%),
+        linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    button:disabled,
+    input:disabled,
+    select:disabled,
+    textarea:disabled {
+      cursor: not-allowed;
+      opacity: 0.68;
+    }
+
+    .page-shell {
+      position: relative;
+      min-height: 100vh;
+      overflow: visible;
+    }
+
+    .page-shell::before,
+    .page-shell::after {
+      content: "";
+      position: absolute;
+      border-radius: 999px;
+      filter: blur(40px);
+      pointer-events: none;
+      opacity: 0.7;
+    }
+
+    .page-shell::before {
+      top: 60px;
+      left: -100px;
+      width: 300px;
+      height: 300px;
+      background: rgba(10, 132, 255, 0.14);
+    }
+
+    .page-shell::after {
+      right: -90px;
+      bottom: 80px;
+      width: 260px;
+      height: 260px;
+      background: rgba(65, 182, 230, 0.12);
+    }
+
+    .grid-overlay {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(to right, rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(15, 23, 42, 0.035) 1px, transparent 1px);
+      background-size: 120px 120px;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.6), transparent 88%);
+      pointer-events: none;
+    }
+
+    .app-layout {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: minmax(390px, var(--sidebar-width)) 1fr;
+      gap: 20px;
+      min-height: auto;
+      align-items: stretch;
+      padding: 20px;
+    }
+
+    .glass-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-md);
+      backdrop-filter: blur(18px) saturate(150%);
+      -webkit-backdrop-filter: blur(18px) saturate(150%);
+    }
+
+    .sidebar,
+    .main-panel {
+      border-radius: var(--radius-2xl);
+      height: 100%;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 20px;
+    }
+
+    .main-panel {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      padding: 22px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.86rem;
+      line-height: 1;
+      letter-spacing: -0.05em;
+    }
+
+    .brand p {
+      margin: 12px 0 0;
+      color: var(--text-secondary);
+      font-size: 0.94rem;
+      line-height: 1.62;
+      max-width: 32ch;
+    }
+
+    .status-pill,
+    .panel-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 36px;
+      padding: 0 14px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .status-pill {
+      background: rgba(18, 183, 106, 0.10);
+      color: var(--green);
+    }
+
+    .status-pill::before,
+    .panel-badge::before {
+      content: "";
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+
+    .panel-badge {
+      background: var(--blue-soft);
+      color: var(--blue);
+    }
+
+    .settings-summary,
+    .preview-toolbar,
+    .preview-placeholder,
+    .loading-card,
+    .result-card,
+    .gallery-item {
+      background: var(--panel-strong);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .settings-summary {
+      display: grid;
+      gap: 10px;
+      padding: 16px 18px;
+      border-radius: var(--radius-xl);
+    }
+
+    .sidebar-form {
+      display: grid;
+      gap: 18px;
+      position: relative;
+      z-index: 1;
+      padding-top: 4px;
+    }
+
+    .sidebar-section {
+      display: grid;
+      gap: 14px;
+      padding: 0 0 18px;
+      border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .sidebar-section:last-of-type {
+      padding-bottom: 0;
+      border-bottom: 0;
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      font-size: 0.92rem;
+      color: var(--text-secondary);
+    }
+
+    .summary-row strong {
+      color: var(--text);
+      text-align: right;
+      font-weight: 600;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .panel-head-copy {
+      min-width: 0;
+    }
+
+    .panel-caption {
+      margin: 6px 0 0;
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+      line-height: 1.55;
+    }
+
+    .section-title {
+      margin: 0;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .field-grid {
+      display: grid;
+      gap: 14px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      align-items: start;
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+      align-content: start;
+    }
+
+    .field label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .field small {
+      display: block;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      line-height: 1.45;
+    }
+
+    .field input,
+    .field select,
+    .field textarea {
+      display: block;
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      padding: 0 16px;
+      color: var(--text);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(249, 251, 255, 0.94));
+      outline: none;
+      transition:
+        border-color 160ms ease,
+        box-shadow 160ms ease,
+        transform 160ms ease,
+        background-color 160ms ease;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), var(--shadow-xs);
+      min-height: var(--control-height);
+    }
+
+    .field textarea {
+      min-height: 162px;
+      padding: 14px 16px;
+      resize: vertical;
+      line-height: 1.55;
+    }
+
+    .field input:focus,
+    .field select:focus,
+    .field textarea:focus {
+      border-color: rgba(10, 132, 255, 0.34);
+      box-shadow:
+        0 0 0 5px rgba(10, 132, 255, 0.10),
+        0 18px 30px rgba(10, 132, 255, 0.08);
+      background: #ffffff;
+    }
+
+    .select-shell {
+      position: relative;
+      display: block;
+      width: 100%;
+      min-height: var(--control-height);
+      z-index: 1;
+    }
+
+    .select-shell.open {
+      z-index: 24;
+    }
+
+    .select-shell::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      right: 18px;
+      width: 9px;
+      height: 9px;
+      border-right: 1.4px solid rgba(15, 23, 42, 0.28);
+      border-bottom: 1.4px solid rgba(15, 23, 42, 0.28);
+      transform: translateY(-58%) rotate(45deg);
+      transition: border-color 160ms ease;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .select-shell.open::after,
+    .select-shell:focus-within::after {
+      border-color: rgba(15, 23, 42, 0.36);
+    }
+
+    .field select {
+      min-height: var(--control-height);
+      padding: 0 48px 0 16px;
+      appearance: none;
+      -webkit-appearance: none;
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .custom-select-trigger {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      min-height: var(--control-height);
+      padding: 0 48px 0 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(249, 251, 255, 0.94));
+      color: var(--text);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), var(--shadow-xs);
+      text-align: left;
+      font-size: 0.96rem;
+      line-height: 1.2;
+      outline: none;
+      transition:
+        border-color 160ms ease,
+        box-shadow 160ms ease,
+        background-color 160ms ease;
+    }
+
+    .custom-select-trigger:focus-visible,
+    .select-shell.open .custom-select-trigger {
+      border-color: rgba(10, 132, 255, 0.34);
+      box-shadow:
+        0 0 0 5px rgba(10, 132, 255, 0.10),
+        0 18px 30px rgba(10, 132, 255, 0.08);
+      background: #ffffff;
+    }
+
+    .custom-select-text {
+      display: block;
+      width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .custom-select-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      right: 0;
+      display: grid;
+      gap: 4px;
+      padding: 8px;
+      border-radius: 18px;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      background: rgba(255, 255, 255, 0.98);
+      box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
+      backdrop-filter: blur(20px) saturate(160%);
+      -webkit-backdrop-filter: blur(20px) saturate(160%);
+      opacity: 0;
+      transform: translateY(-6px) scale(0.98);
+      transform-origin: top center;
+      pointer-events: none;
+      transition:
+        opacity 180ms ease,
+        transform 180ms ease;
+    }
+
+    .select-shell.open .custom-select-menu {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+    }
+
+    .custom-select-option {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      min-height: 42px;
+      padding: 0 12px;
+      border: 0;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--text);
+      text-align: left;
+      font-size: 0.93rem;
+      font-weight: 500;
+    }
+
+    .custom-select-option:hover,
+    .custom-select-option:focus-visible {
+      background: rgba(10, 132, 255, 0.08);
+      outline: none;
+    }
+
+    .custom-select-option.active {
+      background: rgba(10, 132, 255, 0.12);
+      color: var(--blue);
+      font-weight: 700;
+    }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .segmented button,
+    .primary-button,
+    .secondary-button,
+    .icon-button,
+    .download-button,
+    .toast-close,
+    .chip-button {
+      appearance: none;
+      transition:
+        transform 160ms ease,
+        box-shadow 160ms ease,
+        background-color 160ms ease,
+        border-color 160ms ease,
+        opacity 160ms ease;
+    }
+
+    .segmented button,
+    .chip-button,
+    .secondary-button,
+    .icon-button,
+    .download-button {
+      background: #ffffff;
+      border: 1px solid var(--line);
+      color: var(--text);
+    }
+
+    .segmented button,
+    .chip-button {
+      min-height: 48px;
+      padding: 0 14px;
+      border-radius: var(--radius-md);
+      font-weight: 600;
+    }
+
+    .segmented button.active,
+    .chip-button.active {
+      background: var(--blue-soft);
+      border-color: rgba(10, 132, 255, 0.18);
+      color: var(--blue);
+      box-shadow: inset 0 0 0 1px rgba(10, 132, 255, 0.10);
+    }
+
+    .segmented button:hover:not(:disabled),
+    .primary-button:hover:not(:disabled),
+    .secondary-button:hover:not(:disabled),
+    .icon-button:hover:not(:disabled),
+    .download-button:hover:not(:disabled),
+    .chip-button:hover:not(:disabled),
+    .toast-close:hover:not(:disabled) {
+      transform: translateY(-1px);
+    }
+
+    .primary-button,
+    .secondary-button {
+      min-height: 56px;
+      border-radius: var(--radius-lg);
+      font-weight: 700;
+      border: 0;
+    }
+
+    .primary-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      background: linear-gradient(180deg, #2b95ff 0%, var(--blue) 100%);
+      color: #ffffff;
+      box-shadow: 0 18px 30px rgba(10, 132, 255, 0.22);
+    }
+
+    .secondary-button {
+      background: #ffffff;
+      border: 1px solid var(--line);
+      color: var(--text);
+    }
+
+    .button-row {
+      display: grid;
+      gap: 12px;
+      margin-top: auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    .main-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 18px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+    }
+
+    .main-header h2 {
+      margin: 0;
+      font-size: clamp(2rem, 3vw, 2.9rem);
+      line-height: 1.02;
+      letter-spacing: -0.06em;
+    }
+
+    .main-header p {
+      margin: 12px 0 0;
+      max-width: 620px;
+      color: var(--text-secondary);
+      font-size: 1rem;
+      line-height: 1.55;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .icon-button {
+      width: 50px;
+      height: 50px;
+      border-radius: 16px;
+      box-shadow: var(--shadow-sm);
+      font-size: 1.12rem;
+    }
+
+    .preview-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 16px;
+      border-radius: var(--radius-xl);
+      margin-bottom: 14px;
+    }
+
+    .preview-toolbar strong {
+      display: block;
+      font-size: 1rem;
+    }
+
+    .toolbar-status-completed {
+      color: var(--danger);
+      font-weight: 800;
+      letter-spacing: 0.01em;
+    }
+
+    .preview-toolbar > div {
+      min-width: 0;
+      flex: 1;
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(246, 249, 255, 0.88));
+      border: 1px solid rgba(15, 23, 42, 0.05);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    }
+
+    .preview-toolbar span {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    .preview-shell {
+      position: relative;
+      flex: 1;
+      min-height: 520px;
+      padding: 0;
+      border-radius: var(--radius-2xl);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(245, 249, 255, 0.86)),
+        #f8fbff;
+      border: 1px solid var(--line);
+      overflow: hidden;
+    }
+
+    .preview-shell::before {
+      content: "";
+      position: absolute;
+      inset: 18px;
+      border-radius: var(--radius-xl);
+      border: 1px dashed rgba(15, 23, 42, 0.08);
+      pointer-events: none;
+    }
+
+    .preview-body {
+      position: relative;
+      z-index: 1;
+      min-height: 500px;
+      padding: 20px;
+    }
+
+    .preview-placeholder,
+    .loading-card,
+    .result-card {
+      border-radius: 24px;
+    }
+
+    .preview-placeholder,
+    .loading-wrap {
+      min-height: 420px;
+      display: grid;
+      place-items: center;
+    }
+
+    .preview-placeholder {
+      padding: 30px;
+      text-align: center;
+    }
+
+    .preview-placeholder h3,
+    .loading-card h3 {
+      margin: 0;
+      font-size: 1.36rem;
+      letter-spacing: -0.03em;
+    }
+
+    .preview-placeholder p,
+    .loading-card p {
+      margin: 12px 0 0;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .prompt-sample {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: var(--bg-soft);
+      text-align: left;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+
+    .loading-card {
+      max-width: 520px;
+      padding: 28px;
+      text-align: center;
+    }
+
+    .spinner {
+      width: 54px;
+      height: 54px;
+      margin: 0 auto 18px;
+      border-radius: 50%;
+      border: 4px solid rgba(10, 132, 255, 0.12);
+      border-top-color: var(--blue);
+      animation: spin 0.95s linear infinite;
+    }
+
+    .progress-line {
+      margin-top: 18px;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(10, 132, 255, 0.08);
+      overflow: hidden;
+    }
+
+    .progress-line span {
+      display: block;
+      width: 42%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, rgba(50, 159, 255, 0.55), rgba(10, 132, 255, 1));
+      animation: progress-slide 1.6s ease-in-out infinite;
+    }
+
+    .result-wrap {
+      display: grid;
+      gap: 16px;
+    }
+
+    .result-card {
+      display: grid;
+      gap: 14px;
+      padding: 18px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .meta-item {
+      padding: 14px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, #ffffff, var(--bg-soft-3));
+      border: 1px solid rgba(15, 23, 42, 0.04);
+    }
+
+    .meta-item span {
+      display: block;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      margin-bottom: 8px;
+    }
+
+    .meta-item strong {
+      display: block;
+      font-size: 0.96rem;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    .gallery-item {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border-radius: 22px;
+    }
+
+    .gallery-frame {
+      display: grid;
+      place-items: center;
+      min-height: 240px;
+      padding: 10px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, #ffffff, var(--bg-soft));
+      border: 1px solid var(--line);
+      overflow: hidden;
+    }
+
+    .gallery-frame img {
+      display: block;
+      max-width: 100%;
+      max-height: 540px;
+      width: auto;
+      height: auto;
+      border-radius: 16px;
+      object-fit: contain;
+      box-shadow: var(--shadow-md);
+    }
+
+    .gallery-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .gallery-head strong {
+      font-size: 0.95rem;
+    }
+
+    .gallery-head span {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+
+    .download-button {
+      min-height: 46px;
+      border-radius: 16px;
+      font-weight: 700;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .query-section {
+      display: grid;
+      gap: 16px;
+      margin-top: 18px;
+      padding: 18px;
+      border-radius: var(--radius-xl);
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .query-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+    }
+
+    .query-head h3 {
+      margin: 0;
+      font-size: 1.08rem;
+      letter-spacing: -0.03em;
+    }
+
+    .query-head p {
+      margin: 8px 0 0;
+      color: var(--text-secondary);
+      font-size: 0.92rem;
+      line-height: 1.55;
+    }
+
+    .query-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 140px;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .query-row .field {
+      gap: 8px;
+    }
+
+    .query-row .secondary-button {
+      min-height: var(--control-height);
+      height: var(--control-height);
+      margin-top: 0;
+      border-radius: var(--radius-md);
+    }
+
+    .query-status {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      padding: 10px 14px;
+      border-radius: 16px;
+      background: linear-gradient(180deg, #ffffff, var(--bg-soft-3));
+      border: 1px solid rgba(15, 23, 42, 0.05);
+    }
+
+    .query-results {
+      display: grid;
+      gap: 14px;
+    }
+
+    .query-empty {
+      padding: 18px;
+      border-radius: 18px;
+      background: var(--bg-soft);
+      color: var(--text-secondary);
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+
+    .toasts {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 40;
+      display: grid;
+      gap: 12px;
+      width: min(360px, calc(100vw - 32px));
+    }
+
+    .toast {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .toast.error {
+      border-color: rgba(217, 45, 32, 0.16);
+      background: linear-gradient(180deg, #ffffff, #fff7f6);
+    }
+
+    .toast.success {
+      border-color: rgba(18, 183, 106, 0.18);
+      background: linear-gradient(180deg, #ffffff, #f7fff9);
+    }
+
+    .toast strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.95rem;
+    }
+
+    .toast p {
+      margin: 0;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      font-size: 0.9rem;
+    }
+
+    .toast-close {
+      width: 32px;
+      height: 32px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #ffffff;
+      color: var(--text-secondary);
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: none;
+      place-items: center;
+      padding: 20px;
+      background: rgba(15, 23, 42, 0.18);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .modal-backdrop.open {
+      display: grid;
+    }
+
+    .modal-card {
+      width: min(580px, 100%);
+      padding: 26px;
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.98);
+      border: 1px solid var(--line-strong);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .modal-card h3 {
+      margin: 0;
+      font-size: 1.45rem;
+      letter-spacing: -0.03em;
+    }
+
+    .modal-card p {
+      margin: 10px 0 20px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .modal-actions button {
+      min-width: 112px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .mobile-settings {
+      display: none;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes progress-slide {
+      0% {
+        transform: translateX(-130%);
+      }
+
+      100% {
+        transform: translateX(300%);
+      }
+    }
+
+    @media (max-width: 1180px) {
+      .app-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .main-panel {
+        min-height: 60vh;
+      }
+    }
+
+    @media (max-width: 820px) {
+      .app-layout {
+        padding: 14px;
+        gap: 14px;
+      }
+
+      .sidebar,
+      .main-panel,
+      .modal-card {
+        padding: 18px;
+        border-radius: 24px;
+      }
+
+      .brand,
+      .main-header,
+      .preview-toolbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .two-col,
+      .meta-grid,
+      .query-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .toolbar {
+        width: 100%;
+        justify-content: flex-end;
+      }
+
+      .mobile-settings {
+        display: inline-flex;
+      }
+
+      .toasts {
+        top: auto;
+        bottom: 14px;
+        left: 14px;
+        right: 14px;
+        width: auto;
+      }
+    }
+
+    .page-footer {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: flex-end;
+      padding: 8px 24px 16px;
+    }
+
+    .page-footer a {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      letter-spacing: 0.02em;
+      transition: color 160ms ease;
+    }
+
+    .page-footer a:hover {
+      color: var(--text-secondary);
+    }
+
+    .error-card {
+      display: grid;
+      gap: 12px;
+      padding: 20px;
+      border-radius: var(--radius-xl);
+      background: linear-gradient(180deg, #ffffff, #fff7f6);
+      border: 1px solid rgba(217, 45, 32, 0.18);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .error-card h3 {
+      margin: 0;
+      font-size: 1.08rem;
+      color: var(--danger);
+      letter-spacing: -0.03em;
+    }
+
+    .error-card p {
+      margin: 0;
+      color: var(--text-secondary);
+      font-size: 0.92rem;
+      line-height: 1.55;
+      word-break: break-word;
+    }
+
+    .error-card .error-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .error-card .error-meta span {
+      padding: 4px 10px;
+      border-radius: 8px;
+      background: rgba(15, 23, 42, 0.04);
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="grid-overlay" aria-hidden="true"></div>
+    <div class="toasts" id="toast-list" aria-live="polite"></div>
+
+    <div class="app-layout">
+      <aside class="sidebar glass-card">
+        <div class="brand">
+          <div>
+            <h1>GPT Image2 个人图片站</h1>
+          </div>
+          <span class="status-pill">本地单文件</span>
+        </div>
+
+        <section class="settings-summary">
+          <div class="summary-row">
+            <span>Base URL</span>
+            <strong id="summary-base-url">未设置</strong>
+          </div>
+          <div class="summary-row">
+            <span>Model ID</span>
+            <strong id="summary-model">未设置</strong>
+          </div>
+          <div class="summary-row">
+            <span>API Key</span>
+            <strong id="summary-api-key">未设置</strong>
+          </div>
+        </section>
+
+        <div class="sidebar-form">
+        <section class="sidebar-section">
+          <div class="segmented">
+            <button type="button" class="mode-button active" data-mode="text">文生图</button>
+            <button type="button" class="mode-button" data-mode="image">图生图</button>
+          </div>
+        </section>
+
+        <section class="sidebar-section">
+          <div class="field-grid">
+            <div class="field">
+              <label for="prompt-textarea">
+                <span>Prompt</span>
+                <span class="panel-badge">必填</span>
+              </label>
+              <textarea
+                id="prompt-textarea"
+                placeholder="描述画面主体、材质、构图、镜头、光线、风格、文字内容和背景细节。"
+              ></textarea>
+            </div>
+          </div>
+        </section>
+
+        <section class="sidebar-section">
+          <div class="field-grid">
+            <div class="two-col">
+              <div class="field">
+                <label for="n-input">张数 n</label>
+                <input id="n-input" type="number" min="1" max="10" step="1" value="1">
+              </div>
+              <div class="field">
+                <label for="size-select">标准尺寸 size</label>
+                <div class="select-shell">
+                  <select id="size-select">
+                    <option value="auto">auto</option>
+                    <option value="1024x1024">1024x1024</option>
+                    <option value="1536x1024">1536x1024</option>
+                    <option value="1024x1536">1024x1536</option>
+                    <option value="2048x2048">2048x2048</option>
+                    <option value="2048x1152">2048x1152</option>
+                    <option value="3840x2160">3840x2160</option>
+                    <option value="2160x3840">2160x3840</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="quality-select">质量 quality</label>
+              <div class="select-shell">
+                <select id="quality-select">
+                  <option value="auto">auto</option>
+                  <option value="low">low</option>
+                  <option value="medium">medium</option>
+                  <option value="high">high</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="background-select">背景 background</label>
+              <div class="select-shell">
+                <select id="background-select">
+                  <option value="">留空</option>
+                  <option value="auto">auto</option>
+                  <option value="opaque">opaque</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="two-col">
+              <div class="field">
+                <label for="output-format-select">输出格式 output_format</label>
+                <div class="select-shell">
+                  <select id="output-format-select">
+                    <option value="">留空</option>
+                    <option value="png">png</option>
+                    <option value="jpeg">jpeg</option>
+                    <option value="webp">webp</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label for="output-compression-input">压缩 output_compression</label>
+                <input id="output-compression-input" type="number" min="0" max="100" step="1" placeholder="0-100">
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="moderation-select">审核 moderation</label>
+              <div class="select-shell">
+                <select id="moderation-select">
+                  <option value="">留空</option>
+                  <option value="auto">auto</option>
+                  <option value="low">low</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="two-col">
+              <div class="field">
+                <label for="partial-images-input">部分图像 partial_images</label>
+                <input id="partial-images-input" type="number" min="0" max="3" step="1" placeholder="0-3">
+              </div>
+              <div></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="sidebar-section">
+          <div class="panel-head">
+            <div class="panel-head-copy">
+              <div class="section-title">图生图扩展</div>
+              <p class="panel-caption">只有在图生图模式下才会启用。可以补充参考图和可选蒙版，适合做局部编辑或视觉延展。</p>
+            </div>
+            <span class="panel-badge">Edit</span>
+          </div>
+          <div class="field-grid two-col">
+            <div class="field" id="image-url-field" hidden>
+              <label for="image-url-input">参考图 URL / OSS 地址</label>
+              <input id="image-url-input" type="url" placeholder="https://example.com/source.png">
+            </div>
+            <div class="field" id="mask-url-field" hidden>
+              <label for="mask-url-input">蒙版 URL（可选）</label>
+              <input id="mask-url-input" type="url" placeholder="https://example.com/mask.png">
+            </div>
+          </div>
+        </section>
+        </div>
+
+        <div class="button-row">
+          <button type="button" class="primary-button" id="generate-button">
+            <span id="generate-button-text">生成图片</span>
+          </button>
+          <button type="button" class="secondary-button" id="open-settings-secondary">接口设置</button>
+        </div>
+      </aside>
+
+      <section class="main-panel glass-card">
+        <header class="main-header">
+          <div>
+            <h2>结果预览与下载</h2>
+          </div>
+          <div class="toolbar">
+            <button type="button" class="icon-button mobile-settings" id="settings-button-mobile" aria-label="打开设置">⚙</button>
+            <button type="button" class="icon-button" id="settings-button" aria-label="打开设置">⚙</button>
+          </div>
+        </header>
+
+        <div class="preview-toolbar">
+          <div>
+            <span>当前模型</span>
+            <strong id="toolbar-model">尚未配置</strong>
+          </div>
+          <div>
+            <span>当前模式</span>
+            <strong id="toolbar-mode">文生图</strong>
+          </div>
+          <div>
+            <span>图像数量</span>
+            <strong id="toolbar-count">0</strong>
+          </div>
+          <div>
+            <span>任务状态</span>
+            <strong id="toolbar-status">待生成</strong>
+          </div>
+        </div>
+
+        <div class="preview-shell">
+          <div class="preview-body">
+            <div id="preview-empty">
+              <div class="preview-placeholder">
+                <div>
+                  <h3>在这里查看生成中的状态和最终图片</h3>
+                  <p>当前页面已经切换为浅色白底。左侧参数面板现在支持更多 image2 / OpenAI 兼容字段，你可以一边调参数一边快速出图。</p>
+                  <div class="prompt-sample">
+                    <strong>当前提示词预览</strong>
+                    <div id="prompt-preview-text" style="margin-top: 8px;">还没有输入提示词</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="preview-loading" class="hidden">
+              <div class="loading-wrap">
+                <div class="loading-card">
+                  <div class="spinner" aria-hidden="true"></div>
+                  <h3>正在生成图片</h3>
+                  <p id="progress-text">任务已经提交，正在等待胜算云返回结果，通常需要 10 到 30 秒。</p>
+                  <div class="progress-line" aria-hidden="true">
+                    <span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="preview-error" class="hidden">
+              <div class="result-wrap">
+                <div class="error-card" id="error-card">
+                  <h3>生成失败</h3>
+                  <p id="error-message-text">发生未知错误。</p>
+                  <div class="error-meta">
+                    <span id="error-request-id">暂无请求 ID</span>
+                    <span id="error-timestamp"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="preview-result" class="hidden">
+              <div class="result-wrap">
+                <div class="result-card">
+                  <div class="meta-grid">
+                    <div class="meta-item">
+                      <span>任务 ID</span>
+                      <strong id="meta-request-id">-</strong>
+                    </div>
+                    <div class="meta-item">
+                      <span>参数摘要</span>
+                      <strong id="meta-settings">-</strong>
+                    </div>
+                    <div class="meta-item">
+                      <span>输出格式</span>
+                      <strong id="meta-output">-</strong>
+                    </div>
+                    <div class="meta-item">
+                      <span>背景 / 风格</span>
+                      <strong id="meta-background-style">-</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="gallery-grid" id="gallery-grid"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <section class="query-section">
+          <div class="query-head">
+            <div>
+              <h3>请求查询板块</h3>
+              <p>输入你已有的 `request_id`，直接调用同一个查询接口取回任务状态和图片结果。适合同步请求排查、补查历史任务，或者手动恢复离开页面前的生成结果。</p>
+            </div>
+            <span class="panel-badge">按 ID 查询</span>
+          </div>
+
+          <div class="query-row">
+            <div class="field">
+              <label for="query-request-id-input">Request ID</label>
+              <input id="query-request-id-input" type="text" placeholder="请输入 request_id">
+            </div>
+            <button type="button" class="secondary-button" id="query-request-button">查询请求</button>
+          </div>
+
+          <div class="query-status" id="query-status-text">输入 request_id 后可单独查询，不会覆盖左侧参数。</div>
+
+          <div class="query-results" id="query-results">
+            <div class="query-empty">这里会展示手动查询返回的任务信息与图片结果。</div>
+          </div>
+        </section>
+      </section>
+    </div>
+
+    <footer class="page-footer">
+      <a href="https://github.com/Winston-Tao1" target="_blank" rel="noopener">made by Winston</a>
+    </footer>
+
+    <div class="modal-backdrop" id="settings-modal">
+      <div class="modal-card">
+        <h3>接口设置</h3>
+        <p>这三个值只保存在本地浏览器存储中，不会写入控制台日志。你可以随时修改并立即生效。</p>
+        <div class="field-grid">
+          <div class="field">
+            <label for="base-url-input">Base URL</label>
+            <input id="base-url-input" type="url" placeholder="https://router.shengsuanyun.com/api">
+          </div>
+          <div class="field">
+            <label for="api-key-input">API Key</label>
+            <input id="api-key-input" type="password" placeholder="请输入胜算云 API Key" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="model-input">Model ID</label>
+            <input id="model-input" type="text" placeholder="例如：openai/gpt-image-2">
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="secondary-button" id="cancel-settings">取消</button>
+          <button type="button" class="primary-button" id="save-settings">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const STORAGE_KEYS = {
+        settings: "shengsuanyun-image2-settings",
+        controls: "shengsuanyun-image2-controls-v2",
+        recentTask: "shengsuanyun-image2-recent-task-v1",
+      };
+
+      const DEFAULT_SETTINGS = {
+        baseUrl: "https://router.shengsuanyun.com/api",
+        apiKey: "",
+        model: "openai/gpt-image-2",
+      };
+
+      const DEFAULT_CONTROLS = {
+        mode: "text",
+        n: 1,
+        size: "1024x1024",
+        quality: "high",
+        background: "",
+        output_format: "",
+        output_compression: "",
+        moderation: "",
+        partial_images: "",
+        image: "",
+        mask: "",
+      };
+
+      const state = {
+        settings: readLocalStorage(STORAGE_KEYS.settings, DEFAULT_SETTINGS),
+        controls: readLocalStorage(STORAGE_KEYS.controls, DEFAULT_CONTROLS),
+        prompt: "",
+        images: [],
+        isGenerating: false,
+        requestId: "",
+        taskStatus: "待生成",
+        progressText: "任务已经提交，正在等待胜算云返回结果，可能需要 1 到 10 分钟。",
+        errorMessage: "",
+        errorTimestamp: "",
+        recentTask: readLocalStorage(STORAGE_KEYS.recentTask, {
+          requestId: "",
+          status: "",
+          prompt: "",
+          images: [],
+          timestamp: 0,
+        }),
+        queryState: {
+          requestId: "",
+          status: "等待查询",
+          images: [],
+          loading: false,
+        },
+      };
+
+      const elements = {
+        summaryBaseUrl: document.getElementById("summary-base-url"),
+        summaryModel: document.getElementById("summary-model"),
+        summaryApiKey: document.getElementById("summary-api-key"),
+        promptTextarea: document.getElementById("prompt-textarea"),
+        promptPreviewText: document.getElementById("prompt-preview-text"),
+        nInput: document.getElementById("n-input"),
+        sizeSelect: document.getElementById("size-select"),
+        qualitySelect: document.getElementById("quality-select"),
+        backgroundSelect: document.getElementById("background-select"),
+        outputFormatSelect: document.getElementById("output-format-select"),
+        outputCompressionInput: document.getElementById("output-compression-input"),
+        moderationSelect: document.getElementById("moderation-select"),
+        partialImagesInput: document.getElementById("partial-images-input"),
+        imageUrlField: document.getElementById("image-url-field"),
+        imageUrlInput: document.getElementById("image-url-input"),
+        maskUrlField: document.getElementById("mask-url-field"),
+        maskUrlInput: document.getElementById("mask-url-input"),
+        modeButtons: Array.from(document.querySelectorAll(".mode-button")),
+        generateButton: document.getElementById("generate-button"),
+        generateButtonText: document.getElementById("generate-button-text"),
+        openSettingsButtons: [
+          document.getElementById("settings-button"),
+          document.getElementById("settings-button-mobile"),
+          document.getElementById("open-settings-secondary"),
+        ],
+        settingsModal: document.getElementById("settings-modal"),
+        baseUrlInput: document.getElementById("base-url-input"),
+        apiKeyInput: document.getElementById("api-key-input"),
+        modelInput: document.getElementById("model-input"),
+        saveSettingsButton: document.getElementById("save-settings"),
+        cancelSettingsButton: document.getElementById("cancel-settings"),
+        previewEmpty: document.getElementById("preview-empty"),
+        previewLoading: document.getElementById("preview-loading"),
+        previewError: document.getElementById("preview-error"),
+        previewResult: document.getElementById("preview-result"),
+        errorMessageText: document.getElementById("error-message-text"),
+        errorRequestId: document.getElementById("error-request-id"),
+        errorTimestamp: document.getElementById("error-timestamp"),
+        progressText: document.getElementById("progress-text"),
+        galleryGrid: document.getElementById("gallery-grid"),
+        toolbarModel: document.getElementById("toolbar-model"),
+        toolbarMode: document.getElementById("toolbar-mode"),
+        toolbarCount: document.getElementById("toolbar-count"),
+        toolbarStatus: document.getElementById("toolbar-status"),
+        metaRequestId: document.getElementById("meta-request-id"),
+        metaSettings: document.getElementById("meta-settings"),
+        metaOutput: document.getElementById("meta-output"),
+        metaBackgroundStyle: document.getElementById("meta-background-style"),
+        toastList: document.getElementById("toast-list"),
+        queryRequestIdInput: document.getElementById("query-request-id-input"),
+        queryRequestButton: document.getElementById("query-request-button"),
+        queryStatusText: document.getElementById("query-status-text"),
+        queryResults: document.getElementById("query-results"),
+      };
+
+      let openCustomSelectShell = null;
+
+      hydrateControls();
+      initCustomSelects();
+      renderAll();
+      bindEvents();
+      autoRestoreRecentTask();
+
+      function bindEvents() {
+        elements.promptTextarea.addEventListener("input", function (event) {
+          state.prompt = event.target.value;
+          renderPromptPreview();
+        });
+
+        bindControlInput(elements.nInput, "n", function (value) {
+          const next = Number(value);
+          return String(Number.isFinite(next) ? Math.min(10, Math.max(1, next)) : 1);
+        });
+        bindControlInput(elements.sizeSelect, "size");
+        bindControlInput(elements.qualitySelect, "quality");
+        bindControlInput(elements.backgroundSelect, "background");
+        bindControlInput(elements.outputFormatSelect, "output_format");
+        bindControlInput(elements.outputCompressionInput, "output_compression");
+        bindControlInput(elements.moderationSelect, "moderation");
+        bindControlInput(elements.partialImagesInput, "partial_images");
+        bindControlInput(elements.imageUrlInput, "image");
+        bindControlInput(elements.maskUrlInput, "mask");
+
+        elements.modeButtons.forEach(function (button) {
+          button.addEventListener("click", function () {
+            state.controls.mode = button.dataset.mode;
+            persistControls();
+            renderMode();
+            renderMeta();
+          });
+        });
+
+        elements.openSettingsButtons.forEach(function (button) {
+          button.addEventListener("click", openSettingsModal);
+        });
+
+        elements.cancelSettingsButton.addEventListener("click", closeSettingsModal);
+        elements.settingsModal.addEventListener("click", function (event) {
+          if (event.target === elements.settingsModal) {
+            closeSettingsModal();
+          }
+        });
+
+        elements.saveSettingsButton.addEventListener("click", function () {
+          state.settings.baseUrl = elements.baseUrlInput.value.trim();
+          state.settings.apiKey = elements.apiKeyInput.value.trim();
+          state.settings.model = elements.modelInput.value.trim();
+          persistSettings();
+          closeSettingsModal();
+          renderSettingsSummary();
+          renderMeta();
+          pushToast("success", "设置已保存", "接口配置已经写入浏览器本地存储。");
+        });
+
+        elements.generateButton.addEventListener("click", handleGenerate);
+        elements.queryRequestButton.addEventListener("click", handleManualQuery);
+
+        document.addEventListener("keydown", function (event) {
+          if (event.key === "Escape" && openCustomSelectShell) {
+            closeCustomSelect();
+            return;
+          }
+
+          if (event.key === "Escape" && elements.settingsModal.classList.contains("open")) {
+            closeSettingsModal();
+          }
+        });
+
+        document.addEventListener("click", function (event) {
+          if (!event.target.closest(".select-shell")) {
+            closeCustomSelect();
+          }
+        });
+      }
+
+      function bindControlInput(element, key, transform) {
+        const eventName = element.tagName === "SELECT" ? "change" : "input";
+
+        element.addEventListener(eventName, function (event) {
+          const rawValue = event.target.value;
+          state.controls[key] = typeof transform === "function" ? transform(rawValue) : rawValue.trim();
+          persistControls();
+          renderMeta();
+        });
+      }
+
+      function hydrateControls() {
+        elements.nInput.value = state.controls.n;
+        elements.sizeSelect.value = state.controls.size;
+        elements.qualitySelect.value = state.controls.quality;
+        elements.backgroundSelect.value = state.controls.background;
+        elements.outputFormatSelect.value = state.controls.output_format;
+        elements.outputCompressionInput.value = state.controls.output_compression;
+        elements.moderationSelect.value = state.controls.moderation;
+        elements.partialImagesInput.value = state.controls.partial_images;
+        elements.imageUrlInput.value = state.controls.image;
+        elements.maskUrlInput.value = state.controls.mask;
+      }
+
+      function initCustomSelects() {
+        const selects = Array.from(document.querySelectorAll(".select-shell select"));
+
+        selects.forEach(function (select) {
+          const shell = select.parentElement;
+          const trigger = document.createElement("button");
+          const text = document.createElement("span");
+          const menu = document.createElement("div");
+
+          trigger.type = "button";
+          trigger.className = "custom-select-trigger";
+          trigger.setAttribute("aria-haspopup", "listbox");
+          trigger.setAttribute("aria-expanded", "false");
+
+          text.className = "custom-select-text";
+          trigger.appendChild(text);
+
+          menu.className = "custom-select-menu";
+          menu.setAttribute("role", "listbox");
+
+          Array.from(select.options).forEach(function (option) {
+            const optionButton = document.createElement("button");
+            optionButton.type = "button";
+            optionButton.className = "custom-select-option";
+            optionButton.textContent = option.textContent;
+            optionButton.dataset.value = option.value;
+            optionButton.setAttribute("role", "option");
+
+            optionButton.addEventListener("click", function () {
+              if (select.value !== option.value) {
+                select.value = option.value;
+                select.dispatchEvent(new Event("change", { bubbles: true }));
+              } else {
+                syncCustomSelect(select);
+              }
+
+              closeCustomSelect();
+            });
+
+            menu.appendChild(optionButton);
+          });
+
+          trigger.addEventListener("click", function () {
+            if (openCustomSelectShell === shell) {
+              closeCustomSelect();
+              return;
+            }
+
+            openCustomSelect(shell);
+          });
+
+          select.addEventListener("change", function () {
+            syncCustomSelect(select);
+          });
+
+          shell.appendChild(trigger);
+          shell.appendChild(menu);
+          syncCustomSelect(select);
+        });
+      }
+
+      function syncCustomSelect(select) {
+        const shell = select.parentElement;
+        const triggerText = shell.querySelector(".custom-select-text");
+        const optionButtons = Array.from(shell.querySelectorAll(".custom-select-option"));
+        const selectedOption = select.options[select.selectedIndex];
+
+        if (triggerText) {
+          triggerText.textContent = selectedOption ? selectedOption.textContent : "";
+        }
+
+        optionButtons.forEach(function (button) {
+          const isActive = button.dataset.value === select.value;
+          button.classList.toggle("active", isActive);
+          button.setAttribute("aria-selected", isActive ? "true" : "false");
+        });
+      }
+
+      function openCustomSelect(shell) {
+        closeCustomSelect();
+        openCustomSelectShell = shell;
+        shell.classList.add("open");
+        const trigger = shell.querySelector(".custom-select-trigger");
+
+        if (trigger) {
+          trigger.setAttribute("aria-expanded", "true");
+        }
+      }
+
+      function closeCustomSelect() {
+        if (!openCustomSelectShell) {
+          return;
+        }
+
+        const trigger = openCustomSelectShell.querySelector(".custom-select-trigger");
+
+        openCustomSelectShell.classList.remove("open");
+
+        if (trigger) {
+          trigger.setAttribute("aria-expanded", "false");
+        }
+
+        openCustomSelectShell = null;
+      }
+
+      function renderAll() {
+        renderSettingsSummary();
+        renderPromptPreview();
+        renderMode();
+        renderMeta();
+        renderPreview();
+        renderQueryResults();
+      }
+
+      function renderSettingsSummary() {
+        elements.summaryBaseUrl.textContent = state.settings.baseUrl || "未设置";
+        elements.summaryModel.textContent = state.settings.model || "未设置";
+        elements.summaryApiKey.textContent = maskApiKey(state.settings.apiKey);
+        elements.toolbarModel.textContent = state.settings.model || "尚未配置";
+      }
+
+      function renderPromptPreview() {
+        elements.promptPreviewText.textContent = state.prompt.trim() || "还没有输入提示词";
+      }
+
+      function renderMode() {
+        const isImageMode = state.controls.mode === "image";
+        elements.modeButtons.forEach(function (button) {
+          button.classList.toggle("active", button.dataset.mode === state.controls.mode);
+        });
+        elements.imageUrlField.hidden = !isImageMode;
+        elements.maskUrlField.hidden = !isImageMode;
+        elements.toolbarMode.textContent = isImageMode ? "图生图" : "文生图";
+      }
+
+      function renderMeta() {
+        elements.metaRequestId.textContent = state.requestId || "-";
+        elements.metaSettings.textContent = [
+          state.controls.n + " 张",
+          resolveRequestedSize(state.controls),
+          state.controls.quality,
+        ].join(" / ");
+
+        elements.metaOutput.textContent = [
+          state.controls.output_format || "默认",
+          state.controls.output_compression ? "压缩 " + state.controls.output_compression : "无压缩参数",
+        ].join(" / ");
+
+        elements.metaBackgroundStyle.textContent = state.controls.background || "背景默认";
+
+        elements.toolbarCount.textContent = String(state.images.length);
+        elements.toolbarStatus.textContent = state.taskStatus;
+        elements.toolbarStatus.classList.toggle(
+          "toolbar-status-completed",
+          isCompletedStatus(state.taskStatus)
+        );
+      }
+
+      function renderPreview() {
+        elements.progressText.textContent = state.progressText;
+        elements.generateButton.disabled = state.isGenerating;
+        elements.generateButtonText.textContent = state.isGenerating ? "生成中..." : "生成图片";
+
+        if (state.isGenerating) {
+          elements.previewEmpty.classList.add("hidden");
+          elements.previewError.classList.add("hidden");
+          elements.previewResult.classList.add("hidden");
+          elements.previewLoading.classList.remove("hidden");
+          return;
+        }
+
+        if (state.errorMessage) {
+          elements.previewEmpty.classList.add("hidden");
+          elements.previewLoading.classList.add("hidden");
+          elements.previewResult.classList.add("hidden");
+          elements.previewError.classList.remove("hidden");
+          elements.errorMessageText.textContent = state.errorMessage;
+          elements.errorRequestId.textContent = state.requestId
+            ? "Request ID: " + state.requestId
+            : "暂无请求 ID";
+          elements.errorTimestamp.textContent = state.errorTimestamp || "";
+          return;
+        }
+
+        if (state.images.length > 0) {
+          elements.previewEmpty.classList.add("hidden");
+          elements.previewLoading.classList.add("hidden");
+          elements.previewError.classList.add("hidden");
+          elements.previewResult.classList.remove("hidden");
+          renderGallery();
+          return;
+        }
+
+        elements.previewLoading.classList.add("hidden");
+        elements.previewError.classList.add("hidden");
+        elements.previewResult.classList.add("hidden");
+        elements.previewEmpty.classList.remove("hidden");
+      }
+
+      function renderQueryResults() {
+        elements.queryRequestButton.disabled = state.queryState.loading;
+        elements.queryRequestButton.textContent = state.queryState.loading ? "查询中..." : "查询请求";
+        elements.queryStatusText.textContent = state.queryState.status || "等待查询";
+
+        if (!state.queryState.images.length) {
+          elements.queryResults.innerHTML =
+            '<div class="query-empty">' +
+            "这里会展示手动查询返回的任务信息与图片结果。" +
+            "</div>";
+          return;
+        }
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "gallery-grid";
+
+        state.queryState.images.forEach(function (url, index) {
+          const card = document.createElement("article");
+          card.className = "gallery-item";
+          card.innerHTML = [
+            '<div class="gallery-head">',
+            "<div>",
+            "<strong>查询结果 " + (index + 1) + "</strong>",
+            '<span>' + escapeHtml(state.queryState.requestId || "-") + "</span>",
+            "</div>",
+            '<button type="button" class="download-button">下载图片</button>',
+            "</div>",
+            '<div class="gallery-frame">',
+            '<img src="' + escapeAttribute(url) + '" alt="查询结果 ' + (index + 1) + '">',
+            "</div>",
+          ].join("");
+
+          card.querySelector(".download-button").addEventListener("click", function () {
+            downloadImage(url, index + 1);
+          });
+
+          wrapper.appendChild(card);
+        });
+
+        elements.queryResults.innerHTML = "";
+        elements.queryResults.appendChild(wrapper);
+      }
+
+      function renderGallery() {
+        elements.galleryGrid.innerHTML = "";
+
+        state.images.forEach(function (url, index) {
+          const card = document.createElement("article");
+          card.className = "gallery-item";
+          card.innerHTML = [
+            '<div class="gallery-head">',
+            "<div>",
+            "<strong>结果图 " + (index + 1) + "</strong>",
+            '<span>' + escapeHtml(state.controls.size) + "</span>",
+            "</div>",
+            '<button type="button" class="download-button">下载图片</button>',
+            "</div>",
+            '<div class="gallery-frame">',
+            '<img src="' + escapeAttribute(url) + '" alt="生成结果 ' + (index + 1) + '">',
+            "</div>",
+          ].join("");
+
+          card.querySelector(".download-button").addEventListener("click", function () {
+            downloadImage(url, index + 1);
+          });
+
+          elements.galleryGrid.appendChild(card);
+        });
+      }
+
+      function openSettingsModal() {
+        elements.baseUrlInput.value = state.settings.baseUrl;
+        elements.apiKeyInput.value = state.settings.apiKey;
+        elements.modelInput.value = state.settings.model;
+        elements.settingsModal.classList.add("open");
+      }
+
+      function closeSettingsModal() {
+        elements.settingsModal.classList.remove("open");
+      }
+
+      function pushToast(type, title, message) {
+        const toast = document.createElement("article");
+        toast.className = "toast " + type;
+        toast.innerHTML = [
+          "<div>",
+          "<strong>" + escapeHtml(title) + "</strong>",
+          "<p>" + escapeHtml(message) + "</p>",
+          "</div>",
+          '<button type="button" class="toast-close" aria-label="关闭提示">×</button>',
+        ].join("");
+
+        const closeButton = toast.querySelector(".toast-close");
+        const removeToast = function () {
+          toast.remove();
+        };
+
+        closeButton.addEventListener("click", removeToast);
+        elements.toastList.appendChild(toast);
+        window.setTimeout(removeToast, 5000);
+      }
+
+      async function handleGenerate() {
+        if (state.isGenerating) {
+          return;
+        }
+
+        try {
+          validateBeforeSubmit();
+        } catch (error) {
+          pushToast("error", "无法开始生成", error.message);
+          return;
+        }
+
+        state.isGenerating = true;
+        state.images = [];
+        state.requestId = "";
+        state.errorMessage = "";
+        state.errorTimestamp = "";
+        state.taskStatus = "任务提交中";
+        state.progressText = "正在提交任务...";
+        renderMeta();
+        renderPreview();
+
+        try {
+          // 提交异步任务，拿到 request_id 后继续轮询结果。
+          const submitResult = await submitImageTask({
+            settings: state.settings,
+            prompt: state.prompt.trim(),
+            controls: state.controls,
+          });
+
+          state.requestId = submitResult.requestId;
+          state.taskStatus = submitResult.status || "已提交";
+          state.progressText = "任务已提交，正在向胜算云查询状态...";
+          persistRecentTask({
+            requestId: submitResult.requestId,
+            status: state.taskStatus,
+            prompt: state.prompt.trim(),
+            images: [],
+            timestamp: Date.now(),
+          });
+          renderMeta();
+          renderPreview();
+
+          // 轮询任务状态，直到接口返回图片地址或超时。
+          const result = await pollTaskResult({
+            settings: state.settings,
+            requestId: submitResult.requestId,
+            onProgress: function (payload) {
+              state.taskStatus = payload.status || "处理中";
+
+              if (payload.progress) {
+                state.progressText = "正在生成图片，当前进度：" + payload.progress + "。";
+              } else if (payload.status) {
+                state.progressText = "正在生成图片，当前状态：" + payload.status + "，复杂任务可能需要数分钟。";
+              } else {
+                state.progressText = "正在生成图片，复杂任务可能需要数分钟...";
+              }
+
+              persistRecentTask({
+                requestId: state.requestId,
+                status: state.taskStatus,
+                prompt: state.prompt.trim(),
+                images: state.images,
+                timestamp: Date.now(),
+              });
+
+              renderMeta();
+              renderPreview();
+            },
+          });
+
+          state.images = result.images;
+          state.taskStatus = result.status || "生成完成";
+          persistRecentTask({
+            requestId: state.requestId,
+            status: state.taskStatus,
+            prompt: state.prompt.trim(),
+            images: state.images,
+            timestamp: Date.now(),
+          });
+          pushToast("success", "生成完成", "图片已经生成成功，可以直接预览并逐张下载。");
+        } catch (error) {
+          state.taskStatus = "生成失败";
+          state.errorMessage = error.message || "发生未知错误，请稍后再试。";
+          state.errorTimestamp = new Date().toLocaleString("zh-CN");
+          persistRecentTask({
+            requestId: state.requestId,
+            status: state.taskStatus,
+            prompt: state.prompt.trim(),
+            images: state.images,
+            timestamp: Date.now(),
+          });
+          pushToast("error", "生成失败", state.errorMessage);
+        } finally {
+          state.isGenerating = false;
+          renderMeta();
+          renderPreview();
+        }
+      }
+
+      async function handleManualQuery() {
+        const requestId = (elements.queryRequestIdInput.value || "").trim();
+
+        if (!requestId) {
+          pushToast("error", "无法查询", "请输入 request_id。");
+          return;
+        }
+
+        state.queryState.loading = true;
+        state.queryState.requestId = requestId;
+        state.queryState.status = "正在查询任务状态...";
+        state.queryState.images = [];
+        renderQueryResults();
+
+        try {
+          const result = await fetchTaskSnapshot({
+            settings: state.settings,
+            requestId: requestId,
+          });
+
+          // 手动查询成功后，同步把结果渲染到右侧主预览区，避免“查询成功但主区域没图”。
+          if (result.images.length) {
+            state.requestId = requestId;
+            state.images = result.images.slice();
+            state.taskStatus = result.status || "查询完成";
+            state.progressText = "已通过 request_id 查询到图片结果。";
+            persistRecentTask({
+              requestId: requestId,
+              status: state.taskStatus,
+              prompt: state.prompt.trim(),
+              images: state.images,
+              timestamp: Date.now(),
+            });
+            renderMeta();
+            renderPreview();
+          }
+
+          state.queryState.status = result.status
+            ? "查询完成，当前状态：" + result.status
+            : "查询完成";
+          state.queryState.images = result.images;
+
+          if (!result.images.length) {
+            state.queryState.status = result.status
+              ? "已查到任务，当前状态：" + result.status + "，但暂时没有图片结果。"
+              : "已查到任务，但暂时没有图片结果。";
+          }
+        } catch (error) {
+          state.queryState.status = error.message || "查询失败";
+          state.queryState.images = [];
+          pushToast("error", "查询失败", error.message || "无法查询该 request_id。");
+        } finally {
+          state.queryState.loading = false;
+          renderQueryResults();
+        }
+      }
+
+      function validateBeforeSubmit() {
+        if (!state.settings.baseUrl.trim() || !state.settings.apiKey.trim() || !state.settings.model.trim()) {
+          throw new Error("请先在设置里填写 Base URL、API Key 和 Model ID。");
+        }
+
+        if (!state.prompt.trim()) {
+          throw new Error("请输入提示词后再开始生成。");
+        }
+
+        if (state.controls.mode === "image" && !state.controls.image.trim()) {
+          throw new Error("图生图模式需要填写参考图 URL 或 OSS 地址。");
+        }
+
+        const requestedSize = resolveRequestedSize(state.controls);
+
+        if (!requestedSize) {
+          throw new Error("请填写有效的尺寸参数。");
+        }
+
+        if (state.controls.output_compression !== "") {
+          const compression = Number(state.controls.output_compression);
+
+          if (!Number.isFinite(compression) || compression < 0 || compression > 100) {
+            throw new Error("output_compression 需要在 0 到 100 之间。");
+          }
+        }
+
+        if (state.controls.partial_images !== "") {
+          const partialImages = Number(state.controls.partial_images);
+
+          if (!Number.isFinite(partialImages) || partialImages < 0 || partialImages > 3) {
+            throw new Error("partial_images 建议填写 0 到 3 之间的整数。");
+          }
+        }
+      }
+
+      async function submitImageTask(options) {
+        const endpoint = buildTaskEndpoint(options.settings.baseUrl);
+
+        // 按 OpenAI 兼容 image2 风格组装请求体，空值字段会自动省略。
+        const payload = {
+          model: options.settings.model,
+          prompt: options.prompt,
+          n: clampNumber(options.controls.n, 1, 10, 1),
+          size: resolveRequestedSize(options.controls),
+          quality: options.controls.quality,
+          background: emptyToUndefined(options.controls.background),
+          output_format: emptyToUndefined(options.controls.output_format),
+          output_compression: numberOrUndefined(options.controls.output_compression),
+          moderation: emptyToUndefined(options.controls.moderation),
+          partial_images: numberOrUndefined(options.controls.partial_images),
+          image: options.controls.mode === "image" ? emptyToUndefined(options.controls.image) : undefined,
+          mask: options.controls.mode === "image" ? emptyToUndefined(options.controls.mask) : undefined,
+        };
+
+        removeUndefinedFields(payload);
+
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + options.settings.apiKey,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await parseResponse(response);
+
+        if (!response.ok) {
+          throw new Error(extractErrorMessage(data) || "异步任务提交失败，请检查 Base URL、API Key、模型和参数。");
+        }
+
+        const requestId = extractTaskId(data);
+
+        if (!requestId) {
+          throw new Error("接口返回成功，但没有拿到 request_id，无法继续轮询任务。");
+        }
+
+        return {
+          requestId: requestId,
+          status: extractTaskStatus(data) || "submitted",
+          raw: data,
+        };
+      }
+
+      async function pollTaskResult(options) {
+        const startedAt = Date.now();
+        const timeoutMs = 600000;
+        const intervalMs = 5000;
+        const endpoint = buildTaskEndpoint(options.settings.baseUrl, options.requestId);
+        let completedRetries = 0;
+        const maxCompletedRetries = 10;
+
+        while (Date.now() - startedAt < timeoutMs) {
+          const response = await fetch(endpoint, {
+            method: "GET",
+            headers: {
+              Authorization: "Bearer " + options.settings.apiKey,
+            },
+          });
+
+          const data = await parseResponse(response);
+
+          if (!response.ok) {
+            throw new Error(extractErrorMessage(data) || "轮询任务状态失败，请检查接口路径或权限。");
+          }
+
+          const status = extractTaskStatus(data);
+          const progress = extractTaskProgress(data);
+          const images = extractImageUrls(data);
+          const b64Images = extractBase64Images(data);
+          const isCompleted = isCompletedStatus(status);
+
+          if (typeof options.onProgress === "function") {
+            options.onProgress({
+              status: status,
+              progress: progress,
+              raw: data,
+            });
+          }
+
+          if (images.length > 0) {
+            return {
+              status: status,
+              images: images,
+              raw: data,
+            };
+          }
+
+          if (b64Images.length > 0) {
+            return {
+              status: status,
+              images: b64Images.map(function (value) {
+                return "data:image/png;base64," + value;
+              }),
+              raw: data,
+            };
+          }
+
+          // 胜算云在 COMPLETED 时可能 progress 已到 100%，但结果对象稍晚落盘。
+          // 这里继续轮询几次，而不是立刻判空失败。
+          if (isCompleted) {
+            completedRetries++;
+            if (completedRetries > maxCompletedRetries) {
+              throw new Error(
+                "任务已完成但未能提取图片链接。" +
+                "请复制 request_id 在「请求查询板块」手动查询，" +
+                "或检查 API 返回的图片字段格式。"
+              );
+            }
+            await wait(intervalMs);
+            continue;
+          }
+
+          if (isFailedStatus(status)) {
+            throw new Error(extractErrorMessage(data) || "图片生成失败，请稍后重试。");
+          }
+
+          await wait(intervalMs);
+        }
+
+        throw new Error("图片生成超时（已等待 10 分钟），请稍后重试或简化提示词。");
+      }
+
+      async function fetchTaskSnapshot(options) {
+        const endpoint = buildTaskEndpoint(options.settings.baseUrl, options.requestId);
+        const response = await fetch(endpoint, {
+          method: "GET",
+          headers: {
+            Authorization: "Bearer " + options.settings.apiKey,
+          },
+        });
+
+        const data = await parseResponse(response);
+
+        if (!response.ok) {
+          throw new Error(extractErrorMessage(data) || "查询任务失败，请检查 request_id 或接口配置。");
+        }
+
+        const code = String(data?.code || "").toLowerCase();
+        const status = extractTaskStatus(data);
+        const images = extractImageUrls(data);
+        const b64Images = extractBase64Images(data);
+        const normalizedImages = images.length
+          ? images
+          : b64Images.map(function (value) {
+              return "data:image/png;base64," + value;
+            });
+
+        if (code && code !== "success") {
+          throw new Error(extractErrorMessage(data) || "查询接口没有返回 success。");
+        }
+
+        return {
+          status: status,
+          images: normalizedImages,
+          raw: data,
+        };
+      }
+
+      function buildTaskEndpoint(baseUrl, requestId) {
+        const normalizedBase = normalizeBaseUrl(baseUrl);
+        return normalizedBase + "/v1/tasks/generations" + (requestId ? "/" + encodeURIComponent(requestId) : "");
+      }
+
+      function normalizeBaseUrl(baseUrl) {
+        return (baseUrl || "").trim().replace(/\/+$/, "");
+      }
+
+      function extractTaskId(payload) {
+        return (
+          payload?.request_id ||
+          payload?.id ||
+          payload?.task_id ||
+          payload?.data?.request_id ||
+          payload?.data?.id ||
+          ""
+        );
+      }
+
+      function extractTaskStatus(payload) {
+        return String(
+          payload?.task_status ||
+          payload?.status ||
+          payload?.data?.status ||
+          payload?.data?.task_status ||
+          payload?.data?.data?.status ||
+          payload?.result?.status ||
+          ""
+        ).toLowerCase();
+      }
+
+      function extractTaskProgress(payload) {
+        return (
+          payload?.progress ||
+          payload?.data?.progress ||
+          payload?.data?.data?.progress ||
+          payload?.result?.progress ||
+          ""
+        );
+      }
+
+      function extractImageUrls(payload) {
+        // 尝试多种可能的响应路径
+        const urls =
+          payload?.data?.image_urls ||
+          payload?.data?.data?.image_urls ||
+          payload?.data?.result?.image_urls ||
+          payload?.data?.output?.image_urls ||
+          payload?.data?.data?.output?.image_urls ||
+          payload?.data?.data?.result?.image_urls ||
+          payload?.output?.image_urls ||
+          payload?.result?.image_urls ||
+          payload?.image_urls ||
+          [];
+
+        if (Array.isArray(urls)) {
+          return urls.filter(function (item) {
+            return item && typeof item === "string";
+          });
+        }
+
+        // 某些 API 返回 { data: [{ url: "..." }] } 格式
+        const dataArray = payload?.data || payload?.data?.data;
+        if (Array.isArray(dataArray)) {
+          return dataArray
+            .filter(function (item) {
+              return item && item.url;
+            })
+            .map(function (item) {
+              return item.url;
+            });
+        }
+
+        return [];
+      }
+
+      function extractBase64Images(payload) {
+        const values =
+          payload?.data?.b64_json ||
+          payload?.data?.data?.b64_json ||
+          payload?.data?.result?.b64_json ||
+          payload?.data?.output?.b64_json ||
+          payload?.data?.data?.output?.b64_json ||
+          payload?.data?.data?.result?.b64_json ||
+          payload?.output?.b64_json ||
+          payload?.result?.b64_json ||
+          [];
+
+        if (Array.isArray(values)) {
+          return values.filter(Boolean);
+        }
+
+        // 某些 API 返回 { data: [{ b64_json: "..." }] } 格式
+        const dataArray = payload?.data || payload?.data?.data;
+        if (Array.isArray(dataArray)) {
+          return dataArray
+            .filter(function (item) {
+              return item && item.b64_json;
+            })
+            .map(function (item) {
+              return item.b64_json;
+            });
+        }
+
+        return [];
+      }
+
+      function isCompletedStatus(status) {
+        return ["completed", "succeeded", "success"].includes(String(status || "").toLowerCase());
+      }
+
+      function isFailedStatus(status) {
+        return ["failed", "error", "cancelled", "canceled", "timeout"].includes(String(status || "").toLowerCase());
+      }
+
+      function extractErrorMessage(payload) {
+        return (
+          payload?.error?.message ||
+          payload?.message ||
+          payload?.detail ||
+          payload?.msg ||
+          payload?.data?.fail_reason ||
+          ""
+        );
+      }
+
+      async function parseResponse(response) {
+        const contentType = response.headers.get("content-type") || "";
+
+        if (contentType.includes("application/json")) {
+          return response.json();
+        }
+
+        return {
+          message: await response.text(),
+        };
+      }
+
+      async function downloadImage(url, index) {
+        const suffix = inferFileExtension(url, state.controls.output_format);
+        const filename = "gpt-image2-" + String(index).padStart(2, "0") + "-" + Date.now() + "." + suffix;
+
+        try {
+          const response = await fetch(url);
+
+          if (!response.ok) {
+            throw new Error("下载图片失败");
+          }
+
+          const blob = await response.blob();
+          const objectUrl = URL.createObjectURL(blob);
+          triggerDownload(objectUrl, filename);
+          URL.revokeObjectURL(objectUrl);
+        } catch (error) {
+          triggerDownload(url, filename);
+        }
+      }
+
+      function triggerDownload(url, filename) {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.target = "_blank";
+        link.rel = "noopener";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+
+      function persistSettings() {
+        window.localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(state.settings));
+      }
+
+      function persistControls() {
+        window.localStorage.setItem(STORAGE_KEYS.controls, JSON.stringify(state.controls));
+      }
+
+      function persistRecentTask(nextTask) {
+        state.recentTask = Object.assign({}, state.recentTask, nextTask);
+        window.localStorage.setItem(STORAGE_KEYS.recentTask, JSON.stringify(state.recentTask));
+      }
+
+      async function autoRestoreRecentTask() {
+        const recentTask = state.recentTask || {};
+        const hasRequestId = recentTask.requestId && String(recentTask.requestId).trim();
+
+        if (!hasRequestId) {
+          return;
+        }
+
+        if (Array.isArray(recentTask.images) && recentTask.images.length > 0) {
+          state.requestId = recentTask.requestId;
+          state.images = recentTask.images.slice();
+          state.taskStatus = recentTask.status || "已恢复";
+          if (recentTask.prompt) {
+            state.prompt = recentTask.prompt;
+            elements.promptTextarea.value = recentTask.prompt;
+          }
+          renderPromptPreview();
+          renderMeta();
+          renderPreview();
+          return;
+        }
+
+        state.requestId = recentTask.requestId;
+        state.taskStatus = recentTask.status || "恢复中";
+        state.progressText = "检测到你上次未完成的任务，正在自动恢复结果...";
+        state.isGenerating = true;
+        renderMeta();
+        renderPreview();
+
+        try {
+          const result = await pollTaskResult({
+            settings: state.settings,
+            requestId: recentTask.requestId,
+            onProgress: function (payload) {
+              state.taskStatus = payload.status || "恢复中";
+              state.progressText = payload.status
+                ? "正在恢复上次任务，当前状态：" + payload.status + "。"
+                : "正在恢复上次任务结果...";
+              renderMeta();
+              renderPreview();
+            },
+          });
+
+          state.images = result.images;
+          state.taskStatus = result.status || "恢复完成";
+          persistRecentTask({
+            requestId: recentTask.requestId,
+            status: state.taskStatus,
+            prompt: recentTask.prompt || state.prompt,
+            images: state.images,
+            timestamp: Date.now(),
+          });
+          pushToast("success", "任务已恢复", "检测到上次已完成任务，结果已经重新渲染到页面。");
+        } catch (error) {
+          state.taskStatus = "恢复失败";
+          pushToast("error", "恢复失败", error.message || "无法恢复上次任务结果。");
+        } finally {
+          state.isGenerating = false;
+          renderMeta();
+          renderPreview();
+        }
+      }
+
+      function readLocalStorage(key, fallback) {
+        try {
+          const raw = window.localStorage.getItem(key);
+          if (!raw) {
+            return { ...fallback };
+          }
+          return Object.assign({}, fallback, JSON.parse(raw));
+        } catch (error) {
+          return { ...fallback };
+        }
+      }
+
+      function maskApiKey(apiKey) {
+        if (!apiKey) {
+          return "未设置";
+        }
+
+        if (apiKey.length <= 8) {
+          return "已设置";
+        }
+
+        return apiKey.slice(0, 4) + "••••" + apiKey.slice(-4);
+      }
+
+      function emptyToUndefined(value) {
+        const trimmed = String(value || "").trim();
+        return trimmed ? trimmed : undefined;
+      }
+
+      function numberOrUndefined(value) {
+        if (value === "" || value == null) {
+          return undefined;
+        }
+
+        const next = Number(value);
+        return Number.isFinite(next) ? next : undefined;
+      }
+
+      function clampNumber(value, min, max, fallback) {
+        const next = Number(value);
+        if (!Number.isFinite(next)) {
+          return fallback;
+        }
+        return Math.min(max, Math.max(min, next));
+      }
+
+      function resolveRequestedSize(controls) {
+        return String(controls.size || "").trim();
+      }
+
+      function removeUndefinedFields(payload) {
+        Object.keys(payload).forEach(function (key) {
+          if (payload[key] === undefined) {
+            delete payload[key];
+          }
+        });
+      }
+
+      function inferFileExtension(url, preferred) {
+        if (preferred) {
+          return preferred;
+        }
+
+        const matched = String(url).match(/\.(png|jpg|jpeg|webp)(?:$|\?)/i);
+        if (matched) {
+          return matched[1].toLowerCase() === "jpg" ? "jpeg" : matched[1].toLowerCase();
+        }
+
+        if (String(url).startsWith("data:image/webp")) {
+          return "webp";
+        }
+
+        if (String(url).startsWith("data:image/jpeg")) {
+          return "jpeg";
+        }
+
+        return "png";
+      }
+
+      function wait(ms) {
+        return new Promise(function (resolve) {
+          window.setTimeout(resolve, ms);
+        });
+      }
+
+      function escapeHtml(text) {
+        return String(text)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function escapeAttribute(text) {
+        return escapeHtml(text);
+      }
+    })();
+  </script>
+</body>
+</html>
