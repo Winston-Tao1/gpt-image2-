@@ -259,17 +259,19 @@
     }
 
     .summary-row {
-      display: flex;
-      justify-content: space-between;
-      gap: 14px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 4px;
       font-size: 0.92rem;
       color: var(--text-secondary);
     }
 
     .summary-row strong {
       color: var(--text);
-      text-align: right;
       font-weight: 600;
+      font-size: 0.82rem;
+      line-height: 1.4;
+      word-break: break-all;
     }
 
     .panel-head {
