@@ -126,7 +126,7 @@
 | CSS | 内嵌 `<style>`，Glass Morphism 风格 |
 | JavaScript | 内嵌 `<script>`（IIFE 模式），原生 ES6+ |
 | 数据持久化 | `localStorage`（3 个 key） |
-| API 端点 | `POST /v1/tasks/generations`（提交）<br>`GET /v1/tasks/generations/{request_id}`（查询） |
+| API 端点 | `POST /tasks/generations`（提交）<br>`GET /tasks/generations/{request_id}`（查询）<br>端点拼接在 Base URL 之后，例如 `https://your-api.com/v1/tasks/generations` |
 | 响应格式 | 兼容多种嵌套结构（URL 图片 + Base64 图片） |
 
 ---

@@ -2392,7 +2392,7 @@
 
       function buildTaskEndpoint(baseUrl, requestId) {
         const normalizedBase = normalizeBaseUrl(baseUrl);
-        return normalizedBase + "/v1/tasks/generations" + (requestId ? "/" + encodeURIComponent(requestId) : "");
+        return normalizedBase + "/tasks/generations" + (requestId ? "/" + encodeURIComponent(requestId) : "");
       }
 
       function normalizeBaseUrl(baseUrl) {
