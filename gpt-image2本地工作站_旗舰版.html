@@ -428,7 +428,7 @@
       padding: 0 48px 0 16px;
       border: 1px solid var(--line);
       border-radius: var(--radius-md);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(249, 251, 255, 0.94));
+      background: #ffffff;
       color: var(--text);
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), var(--shadow-xs);
       text-align: left;
@@ -472,6 +472,7 @@
       box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
       backdrop-filter: none;
       -webkit-backdrop-filter: none;
+      isolation: isolate;
       opacity: 0;
       transform: translateY(-6px) scale(0.98);
       transform-origin: top center;
@@ -1253,7 +1254,8 @@
           </div>
         </section>
 
-        <section class="sidebar-section">
+        <!-- GPT Image 2 参数面板 -->
+        <section class="sidebar-section" id="gpt-params">
           <div class="field-grid">
             <div class="two-col">
               <div class="field">
@@ -1335,6 +1337,75 @@
                 <input id="partial-images-input" type="number" min="0" max="3" step="1" placeholder="0-3">
               </div>
               <div></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Seeddream 5.0 Pro 参数面板 -->
+        <section class="sidebar-section" id="seedream-params" style="display:none">
+          <div class="field-grid">
+            <div class="two-col">
+              <div class="field">
+                <label for="n-input-sd">张数 n</label>
+                <input id="n-input-sd" type="number" min="1" max="10" step="1" value="1">
+              </div>
+              <div class="field">
+                <label for="size-select-sd">尺寸 size</label>
+                <div class="select-shell">
+                  <select id="size-select-sd">
+                    <option value="1K">1K</option>
+                    <option value="2K">2K</option>
+                    <option value="custom">自定义</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="field" id="sd-custom-size-field" style="display:none">
+              <label for="size-custom-input">自定义尺寸（宽x高）</label>
+              <input id="size-custom-input" type="text" placeholder="例如：1280x720">
+            </div>
+
+            <div class="two-col">
+              <div class="field">
+                <label for="output-format-select-sd">输出格式 output_format</label>
+                <div class="select-shell">
+                  <select id="output-format-select-sd">
+                    <option value="jpeg">jpeg</option>
+                    <option value="png">png</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label for="response-format-select-sd">返回格式 response_format</label>
+                <div class="select-shell">
+                  <select id="response-format-select-sd">
+                    <option value="url">url</option>
+                    <option value="b64_json">b64_json</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="two-col">
+              <div class="field">
+                <label for="watermark-select-sd">水印 watermark</label>
+                <div class="select-shell">
+                  <select id="watermark-select-sd">
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label for="optimize-prompt-select-sd">优化提示词 optimize_prompt</label>
+                <div class="select-shell">
+                  <select id="optimize-prompt-select-sd">
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -1512,8 +1583,13 @@
             <input id="api-key-input" type="password" placeholder="请输入 API Key" autocomplete="off">
           </div>
           <div class="field">
-            <label for="model-input">Model ID</label>
-            <input id="model-input" type="text" placeholder="例如：openai/gpt-image-2">
+            <label for="model-select">Model ID</label>
+            <div class="select-shell" id="model-select-shell">
+              <select id="model-select">
+                <option value="openai/gpt-image-2">openai/gpt-image-2</option>
+                <option value="bytedance/doubao-seedream-5-0-pro">bytedance/doubao-seedream-5-0-pro</option>
+              </select>
+            </div>
           </div>
         </div>
         <div class="modal-actions">
@@ -1550,6 +1626,13 @@
         partial_images: "",
         image: "",
         mask: "",
+        sd_n: 1,
+        sd_size: "2K",
+        sd_custom_size: "",
+        sd_output_format: "jpeg",
+        sd_response_format: "url",
+        sd_watermark: "true",
+        sd_optimize_prompt: "true",
       };
 
       const state = {
@@ -1608,7 +1691,19 @@
         settingsModal: document.getElementById("settings-modal"),
         baseUrlInput: document.getElementById("base-url-input"),
         apiKeyInput: document.getElementById("api-key-input"),
-        modelInput: document.getElementById("model-input"),
+        modelSelect: document.getElementById("model-select"),
+        modelSelectShell: document.getElementById("model-select-shell"),
+        brandTitle: document.querySelector(".brand h1"),
+        gptParams: document.getElementById("gpt-params"),
+        seedreamParams: document.getElementById("seedream-params"),
+        nInputSD: document.getElementById("n-input-sd"),
+        sizeSelectSD: document.getElementById("size-select-sd"),
+        sdCustomSizeField: document.getElementById("sd-custom-size-field"),
+        sizeCustomInput: document.getElementById("size-custom-input"),
+        outputFormatSelectSD: document.getElementById("output-format-select-sd"),
+        responseFormatSelectSD: document.getElementById("response-format-select-sd"),
+        watermarkSelectSD: document.getElementById("watermark-select-sd"),
+        optimizePromptSelectSD: document.getElementById("optimize-prompt-select-sd"),
         saveSettingsButton: document.getElementById("save-settings"),
         cancelSettingsButton: document.getElementById("cancel-settings"),
         previewEmpty: document.getElementById("preview-empty"),
@@ -1663,6 +1758,26 @@
         bindControlInput(elements.imageUrlInput, "image");
         bindControlInput(elements.maskUrlInput, "mask");
 
+        // Seeddream 参数控件事件绑定
+        bindControlInput(elements.nInputSD, "sd_n", function (value) {
+          const next = Number(value);
+          return String(Number.isFinite(next) ? Math.min(10, Math.max(1, next)) : 1);
+        });
+        bindControlInput(elements.sizeSelectSD, "sd_size");
+        bindControlInput(elements.sizeCustomInput, "sd_custom_size");
+        bindControlInput(elements.outputFormatSelectSD, "sd_output_format");
+        bindControlInput(elements.responseFormatSelectSD, "sd_response_format");
+        bindControlInput(elements.watermarkSelectSD, "sd_watermark");
+        bindControlInput(elements.optimizePromptSelectSD, "sd_optimize_prompt");
+
+        if (elements.sizeSelectSD) {
+          elements.sizeSelectSD.addEventListener("change", function () {
+            if (elements.sdCustomSizeField) {
+              elements.sdCustomSizeField.style.display = this.value === "custom" ? "" : "none";
+            }
+          });
+        }
+
         elements.modeButtons.forEach(function (button) {
           button.addEventListener("click", function () {
             state.controls.mode = button.dataset.mode;
@@ -1686,9 +1801,10 @@
         elements.saveSettingsButton.addEventListener("click", function () {
           state.settings.baseUrl = elements.baseUrlInput.value.trim();
           state.settings.apiKey = elements.apiKeyInput.value.trim();
-          state.settings.model = elements.modelInput.value.trim();
+          state.settings.model = elements.modelSelect ? elements.modelSelect.value.trim() : "";
           persistSettings();
           closeSettingsModal();
+          renderBrandTitle();
           renderSettingsSummary();
           renderMeta();
           pushToast("success", "设置已保存", "接口配置已经写入浏览器本地存储。");
@@ -1737,6 +1853,18 @@
         elements.partialImagesInput.value = state.controls.partial_images;
         elements.imageUrlInput.value = state.controls.image;
         elements.maskUrlInput.value = state.controls.mask;
+        if (elements.nInputSD) elements.nInputSD.value = state.controls.sd_n;
+        if (elements.sizeSelectSD) {
+          elements.sizeSelectSD.value = state.controls.sd_size;
+          if (elements.sdCustomSizeField) {
+            elements.sdCustomSizeField.style.display = state.controls.sd_size === "custom" ? "" : "none";
+          }
+        }
+        if (elements.sizeCustomInput) elements.sizeCustomInput.value = state.controls.sd_custom_size || "";
+        if (elements.outputFormatSelectSD) elements.outputFormatSelectSD.value = state.controls.sd_output_format;
+        if (elements.responseFormatSelectSD) elements.responseFormatSelectSD.value = state.controls.sd_response_format;
+        if (elements.watermarkSelectSD) elements.watermarkSelectSD.value = state.controls.sd_watermark;
+        if (elements.optimizePromptSelectSD) elements.optimizePromptSelectSD.value = state.controls.sd_optimize_prompt;
       }
 
       function initCustomSelects() {
@@ -1845,12 +1973,25 @@
       }
 
       function renderAll() {
+        renderBrandTitle();
         renderSettingsSummary();
         renderPromptPreview();
         renderMode();
         renderMeta();
         renderPreview();
         renderQueryResults();
+      }
+
+      function renderBrandTitle() {
+        var isSeedream = state.settings.model.indexOf("seedream") !== -1;
+        if (elements.brandTitle) {
+          elements.brandTitle.textContent = isSeedream
+            ? "Seeddream 5 Pro Image2 个人图片站"
+            : "GPT Image2 个人图片站";
+        }
+        // 切换参数面板
+        if (elements.gptParams) elements.gptParams.style.display = isSeedream ? "none" : "";
+        if (elements.seedreamParams) elements.seedreamParams.style.display = isSeedream ? "" : "none";
       }
 
       function renderSettingsSummary() {
@@ -1879,18 +2020,33 @@
 
       function renderMeta() {
         elements.metaRequestId.textContent = state.requestId || "-";
-        elements.metaSettings.textContent = [
-          state.controls.n + " 张",
-          resolveRequestedSize(state.controls),
-          state.controls.quality,
-        ].join(" / ");
 
-        elements.metaOutput.textContent = [
-          state.controls.output_format || "默认",
-          state.controls.output_compression ? "压缩 " + state.controls.output_compression : "无压缩参数",
-        ].join(" / ");
+        if (isSeedreamModel()) {
+          var sdSizeSelect = elements.sizeSelectSD ? elements.sizeSelectSD.value : "2K";
+          var sdSize = sdSizeSelect;
+          if (sdSizeSelect === "custom" && elements.sizeCustomInput) {
+            sdSize = "自定义 " + (elements.sizeCustomInput.value.trim() || "未填写");
+          }
+          var sdN = elements.nInputSD ? elements.nInputSD.value : "1";
+          elements.metaSettings.textContent = sdN + " 张 / " + sdSize;
+          elements.metaOutput.textContent = (elements.outputFormatSelectSD ? elements.outputFormatSelectSD.value : "jpeg") +
+            " / " + (elements.responseFormatSelectSD ? elements.responseFormatSelectSD.value : "url");
+          elements.metaBackgroundStyle.textContent = "水印 " + (elements.watermarkSelectSD && elements.watermarkSelectSD.value === "true" ? "开启" : "关闭") +
+            " / 优化提示词 " + (elements.optimizePromptSelectSD && elements.optimizePromptSelectSD.value === "true" ? "开启" : "关闭");
+        } else {
+          elements.metaSettings.textContent = [
+            state.controls.n + " 张",
+            resolveRequestedSize(state.controls),
+            state.controls.quality,
+          ].join(" / ");
 
-        elements.metaBackgroundStyle.textContent = state.controls.background || "背景默认";
+          elements.metaOutput.textContent = [
+            state.controls.output_format || "默认",
+            state.controls.output_compression ? "压缩 " + state.controls.output_compression : "无压缩参数",
+          ].join(" / ");
+
+          elements.metaBackgroundStyle.textContent = state.controls.background || "背景默认";
+        }
 
         elements.toolbarCount.textContent = String(state.images.length);
         elements.toolbarStatus.textContent = state.taskStatus;
@@ -2014,7 +2170,10 @@
       function openSettingsModal() {
         elements.baseUrlInput.value = state.settings.baseUrl;
         elements.apiKeyInput.value = state.settings.apiKey;
-        elements.modelInput.value = state.settings.model;
+        if (elements.modelSelect) {
+          elements.modelSelect.value = state.settings.model;
+          syncCustomSelect(elements.modelSelect);
+        }
         elements.settingsModal.classList.add("open");
       }
 
@@ -2213,6 +2372,16 @@
           throw new Error("图生图模式需要填写参考图 URL 或 OSS 地址。");
         }
 
+        if (isSeedreamModel()) {
+          const sdSize = elements.sizeSelectSD ? elements.sizeSelectSD.value : "2K";
+          if (sdSize === "custom") {
+            const customSize = (elements.sizeCustomInput ? elements.sizeCustomInput.value : "").trim();
+            if (!customSize || !/^\d+x\d+$/i.test(customSize)) {
+              throw new Error("Seeddream 自定义尺寸需要填写有效的宽x高，例如：1280x720。");
+            }
+          }
+        }
+
         const requestedSize = resolveRequestedSize(state.controls);
 
         if (!requestedSize) {
@@ -2236,24 +2405,46 @@
         }
       }
 
-      async function submitImageTask(options) {
-        const endpoint = buildTaskEndpoint(options.settings.baseUrl);
+      function isSeedreamModel() {
+        return state.settings.model.indexOf("seedream") !== -1;
+      }
 
-        // 按 OpenAI 兼容 image2 风格组装请求体，空值字段会自动省略。
-        const payload = {
-          model: options.settings.model,
-          prompt: options.prompt,
-          n: clampNumber(options.controls.n, 1, 10, 1),
-          size: resolveRequestedSize(options.controls),
-          quality: options.controls.quality,
-          background: emptyToUndefined(options.controls.background),
-          output_format: emptyToUndefined(options.controls.output_format),
-          output_compression: numberOrUndefined(options.controls.output_compression),
-          moderation: emptyToUndefined(options.controls.moderation),
-          partial_images: numberOrUndefined(options.controls.partial_images),
-          image: options.controls.mode === "image" ? emptyToUndefined(options.controls.image) : undefined,
-          mask: options.controls.mode === "image" ? emptyToUndefined(options.controls.mask) : undefined,
-        };
+      async function submitImageTask(options) {
+        var endpoint = buildTaskEndpoint(options.settings.baseUrl);
+        var payload;
+
+        if (isSeedreamModel()) {
+          var sdSize = elements.sizeSelectSD ? elements.sizeSelectSD.value : "2K";
+          if (sdSize === "custom" && elements.sizeCustomInput) {
+            sdSize = elements.sizeCustomInput.value.trim();
+          }
+          payload = {
+            model: options.settings.model,
+            prompt: options.prompt,
+            n: elements.nInputSD ? clampNumber(Number(elements.nInputSD.value), 1, 10, 1) : 1,
+            size: sdSize,
+            output_format: elements.outputFormatSelectSD ? elements.outputFormatSelectSD.value : "jpeg",
+            response_format: elements.responseFormatSelectSD ? elements.responseFormatSelectSD.value : "url",
+            watermark: elements.watermarkSelectSD ? elements.watermarkSelectSD.value === "true" : true,
+            optimize_prompt_options: elements.optimizePromptSelectSD ? elements.optimizePromptSelectSD.value === "true" : true,
+            image: options.controls.mode === "image" ? emptyToUndefined(options.controls.image) : undefined,
+          };
+        } else {
+          payload = {
+            model: options.settings.model,
+            prompt: options.prompt,
+            n: clampNumber(options.controls.n, 1, 10, 1),
+            size: resolveRequestedSize(options.controls),
+            quality: options.controls.quality,
+            background: emptyToUndefined(options.controls.background),
+            output_format: emptyToUndefined(options.controls.output_format),
+            output_compression: numberOrUndefined(options.controls.output_compression),
+            moderation: emptyToUndefined(options.controls.moderation),
+            partial_images: numberOrUndefined(options.controls.partial_images),
+            image: options.controls.mode === "image" ? emptyToUndefined(options.controls.image) : undefined,
+            mask: options.controls.mode === "image" ? emptyToUndefined(options.controls.mask) : undefined,
+          };
+        }
 
         removeUndefinedFields(payload);
 
